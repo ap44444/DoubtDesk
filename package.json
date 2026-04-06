@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@clerk/nextjs": "6.37.3",
+    "@clerk/nextjs": "5.32.1",
     "@hookform/resolvers": "5.2.2",
     "@inngest/agent-kit": "0.13.2",
     "@neondatabase/serverless": "1.0.2",

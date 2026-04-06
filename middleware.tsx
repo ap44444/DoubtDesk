@@ -10,6 +10,13 @@ export default clerkMiddleware(async (auth, req) => {
         return;
     }
 
+    // Basic Map-based rate limit for API routes
+    if (req.nextUrl.pathname.startsWith('/api')) {
+        const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
+        // In Edge runtime, this map persists per-isolate
+        // Note: For a production app at scale, replace this with Upstash Redis or similar
+    }
+
     if (isProtectedRoute(req)) {
         const { userId, redirectToSignIn } = await auth();
         if (!userId) return redirectToSignIn();

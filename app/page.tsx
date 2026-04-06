@@ -114,7 +114,7 @@ export default function Home() {
               </SignedIn>
               <SignedOut>
                 <SignUpButton mode="modal" forceRedirectUrl="/rooms">
-                  <button className="group px-10 py-5 bg-white text-slate-950 rounded-2xl text-lg font-bold hover:bg-slate-200 transition-all w-full flex items-center justify-center gap-2">
+                  <button className="group px-10 py-5 bg-white text-slate-950 rounded-2xl text-lg font-bold hover:bg-slate-200 transition-all w-50 flex items-center justify-center gap-2">
                     Get Started Free
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </button>

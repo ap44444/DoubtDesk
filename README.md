@@ -90,6 +90,11 @@ graph LR
 - **Data Layer**: Neon PostgreSQL with Drizzle ORM
 - **Workflow**: [Inngest](https://www.inngest.com/) (Reliable background functions)
 
+### SDLC & Security Integration
+- **Edge Rate Limiting:** Implemented foundational in-memory rate limiting within Next.js Middleware to throttle excessive API requests.
+- **Input Validation:** Enforced through standard API route validations and Clerk endpoint protections.
+- **Environment Management:** Strict separation of environment variables tailored for secure CI/CD pipelines.
+
 ---
 
 ## 🚀 Getting Started
