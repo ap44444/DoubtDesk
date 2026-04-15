@@ -15,7 +15,7 @@ const AppFont = DM_Sans({
 })
 export const metadata: Metadata = {
   title: "DoubtDesk - AI Doubt Solver",
-  description: "DoubtDesk is your personal AI career wingman. From resume analysis to custom learning roadmaps, we provide the tools you need to level up your professional life.",
+  description: "DoubtDesk is an AI-powered collaborative classroom platform where students get instant doubt resolution, teachers manage virtual classrooms, and analytics drive better learning outcomes.",
 };
 
 export default function RootLayout({
