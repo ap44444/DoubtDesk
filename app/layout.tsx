@@ -8,7 +8,6 @@ import { Provider } from "./provider";
 import Footer from "@/components/Footer";
 
 
-
 const AppFont = DM_Sans({
   weight: ['400', '500', '700'],
   subsets: ['latin'],
