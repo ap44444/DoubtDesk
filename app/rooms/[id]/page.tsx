@@ -99,12 +99,16 @@ export default function ClassroomPage() {
         mutate((key) => typeof key === 'string' && key.startsWith('/api/doubts'), undefined, { revalidate: true });
     };
 
-    const copyCode = () => {
+    const copyCode = async () => {
         if (classroom?.inviteCode) {
-            navigator.clipboard.writeText(classroom.inviteCode);
-            setCopied(true);
-            toast.success("Invite code copied!");
-            setTimeout(() => setCopied(false), 2000);
+            try {
+                await navigator.clipboard.writeText(classroom.inviteCode);
+                setCopied(true);
+                toast.success("Invite code copied!", { id: `copy-invite-${classroom.inviteCode}` });
+                setTimeout(() => setCopied(false), 2000);
+            } catch (err) {
+                toast.error("Failed to copy invite code", { id: `copy-invite-error-${classroom.inviteCode}` });
+            }
         }
     };
 

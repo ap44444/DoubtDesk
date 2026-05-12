@@ -26,7 +26,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 const USER_ENDPOINT = "/api/user";
 
 import SessionTracker from "@/components/auth/SessionTracker";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { useRouter, usePathname } from "next/navigation";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 import { CommandMenu } from "@/components/CommandMenu";
@@ -80,7 +80,13 @@ export function Provider({ children }: { children: React.ReactNode }) {
                 <SessionTracker />
                 {children}
                 <CommandMenu />
-                <Toaster theme="dark" closeButton />
+                <Toaster
+                    theme="dark"
+                    closeButton
+                    richColors
+                    duration={4000}
+                    position="top-right"
+                />
             </KeyboardShortcutsProvider>
         </UserContext.Provider>
     );
