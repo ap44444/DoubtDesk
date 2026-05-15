@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Send, CheckCircle, MessageSquare, Loader2, Upload, File, ZoomIn, MoreVertical, Pencil, Trash2, PlusCircle } from "lucide-react";
+import { X, Send, CheckCircle, MessageSquare, Loader2, Upload, File, ZoomIn, MoreVertical, Pencil, Trash2, PlusCircle, ThumbsUp } from "lucide-react";
 import { toast } from "sonner";
 
 interface Reply {
@@ -308,6 +308,7 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                     <button 
                                         onClick={() => setMenuOpenId(menuOpenId === reply.id ? null : reply.id)}
                                         className="p-1.5 hover:bg-white/10 rounded-xl text-slate-500 hover:text-white transition-all"
+                                        aria-label="More options"
                                     >
                                         <MoreVertical className="w-3.5 h-3.5" />
                                     </button>
@@ -370,6 +371,7 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                     <button 
                                         onClick={() => { setFullscreenImageUrl(reply.imageUrl!); setIsFullscreenImageOpen(true); }}
                                         className="mt-2 rounded-2xl overflow-hidden border border-white/5 group/img relative cursor-zoom-in active:scale-[0.98] transition-all w-full"
+                                        aria-label="View image fullscreen"
                                     >
                                         <img src={reply.imageUrl} alt="Solution" className="w-full h-auto object-cover max-h-[32rem]" />
                                         <div className="absolute inset-0 bg-white/0 group-hover/img:bg-white/5 flex items-center justify-center transition-all">
@@ -428,7 +430,7 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-3 hover:bg-white/5 rounded-2xl text-slate-400 transition-colors">
+                    <button onClick={onClose} className="p-3 hover:bg-white/5 rounded-2xl text-slate-400 transition-colors" aria-label="Close modal">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -585,6 +587,7 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                         setFileName("");
                                     }} 
                                     className="p-3 hover:bg-white/5 rounded-2xl text-slate-500 hover:text-white transition-all hover:rotate-90"
+                                    aria-label="Close form"
                                 >
                                     <X className="w-6 h-6" />
                                 </button>
@@ -615,6 +618,7 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                                 type="button"
                                                 onClick={() => { setFullscreenImageUrl(solutionImage); setIsFullscreenImageOpen(true); }}
                                                 className="w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white transition-all scale-75 group-hover/img:scale-100"
+                                                aria-label="Zoom image"
                                             >
                                                 <ZoomIn className="w-5 h-5" />
                                             </button>
@@ -622,6 +626,7 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                                 type="button"
                                                 onClick={() => { setSolutionImage(""); setFileName(""); }}
                                                 className="w-10 h-10 bg-red-500/20 hover:bg-red-500 backdrop-blur-md rounded-xl flex items-center justify-center text-white transition-all scale-75 group-hover/img:scale-100 border border-red-500/20 hover:border-transparent"
+                                                aria-label="Delete image"
                                             >
                                                 <Trash2 className="w-5 h-5" />
                                             </button>
@@ -680,6 +685,7 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                     onClick={() => handlePost('comment')}
                                     disabled={isPosting || !chatText.trim()}
                                     className="absolute right-2 top-2 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all disabled:opacity-50"
+                                    aria-label="Send message"
                                 >
                                     {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                 </button>
@@ -699,6 +705,7 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                     <button 
                         onClick={() => setIsFullscreenImageOpen(false)}
                         className="absolute top-8 right-8 p-4 bg-white/5 hover:bg-white/10 rounded-full text-white transition-all hover:rotate-90 z-[210]"
+                        aria-label="Close fullscreen view"
                     >
                         <X className="w-8 h-8" />
                     </button>

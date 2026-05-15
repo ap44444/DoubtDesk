@@ -498,6 +498,7 @@ export default function ClassroomPage() {
                             <button 
                                 onClick={() => setIsCodeModalOpen(false)}
                                 className="p-2 text-slate-500 hover:text-white transition-colors"
+                                aria-label="Close modal"
                             >
                                 <Plus className="w-5 h-5 rotate-45" />
                             </button>

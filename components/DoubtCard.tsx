@@ -203,6 +203,7 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role }: D
                                     <button 
                                         onClick={() => setIsEditModalOpen(true)}
                                         className="flex-1 sm:flex-none p-3 rounded-xl hover:bg-blue-600/20 text-slate-500 hover:text-blue-400 transition-all group/edit"
+                                        aria-label="Edit doubt"
                                     >
                                         <Edit2 className="w-4 h-4 group-hover/edit:scale-110 transition-transform" />
                                     </button>
@@ -210,6 +211,7 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role }: D
                                 <button 
                                     onClick={() => setIsDeleteDialogOpen(true)}
                                     className="flex-1 sm:flex-none p-3 rounded-xl hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-all group/trash"
+                                    aria-label="Delete doubt"
                                 >
                                     <Trash2 className="w-4 h-4 group-hover/trash:scale-110 transition-transform" />
                                 </button>
@@ -256,6 +258,7 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role }: D
                     <button 
                         className="absolute top-8 right-8 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all z-[110]"
                         onClick={(e) => { e.stopPropagation(); setIsFullscreenImageOpen(false); }}
+                        aria-label="Close fullscreen view"
                     >
                         <X className="w-6 h-6" />
                     </button>

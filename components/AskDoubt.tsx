@@ -121,6 +121,7 @@ export default function AskDoubt({ defaultSubject = "", isOpen, onClose, onSucce
                     <button 
                         onClick={onClose}
                         className="p-2 hover:bg-white/5 rounded-full text-slate-400 transition-colors"
+                        aria-label="Close modal"
                     >
                         <X className="w-6 h-6" />
                     </button>
