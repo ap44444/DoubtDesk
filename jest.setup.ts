@@ -58,3 +58,20 @@ global.IntersectionObserver = class IntersectionObserver {
 
 // Mock scrollIntoView
 Element.prototype.scrollIntoView = jest.fn();
+
+// Mock ESM Markdown packages
+jest.mock("react-markdown", () => ({ children }: { children: any }) => children);
+jest.mock("remark-gfm", () => () => {});
+jest.mock("rehype-sanitize", () => ({
+    __esModule: true,
+    default: () => {},
+    defaultSchema: { attributes: {} }
+}));
+jest.mock("react-syntax-highlighter", () => ({
+    Prism: ({ children }: { children: any }) => children,
+}));
+jest.mock("react-syntax-highlighter/dist/esm/styles/prism", () => ({
+    atomDark: {},
+}));
+jest.mock("remark-math", () => () => {});
+jest.mock("rehype-katex", () => () => {});
