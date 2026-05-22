@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useHotkeys } from "react-hotkeys-hook";
 import { useAppUser } from "../../provider";
-import { 
-    Brain, 
-    MessageSquare, 
-    TrendingUp, 
-    Users, 
-    Settings, 
-    Plus, 
-    Loader2, 
-    Sparkles, 
+import {
+    Brain,
+    MessageSquare,
+    TrendingUp,
+    Users,
+    Settings,
+    Plus,
+    Loader2,
+    Sparkles,
     ChevronLeft,
     School,
     GraduationCap,
@@ -34,8 +35,11 @@ import {
 import AskDoubt from "@/components/AskDoubt";
 import DoubtCard from "@/components/DoubtCard";
 import Dashboard from "@/app/dashboard/page"; // We can reuse or adapt the Analytics view
-import AskAIView from "../../../components/AskAIView"; 
+import AskAIView from "../../../components/AskAIView";
+import ExportButton from "@/components/ExportButton";
 import { toast } from "sonner";
+import useSWRInfinite from "swr/infinite";
+import { useInView } from "react-intersection-observer";
 
 interface Classroom {
     id: number;
@@ -51,20 +55,69 @@ export default function ClassroomPage() {
     const { id } = useParams();
     const router = useRouter();
     const { appUser } = useAppUser();
-    
+
     const [classroom, setClassroom] = useState<Classroom | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("ask-ai");
     const [activeAIDoubt, setActiveAIDoubt] = useState<any>(null);
-    const [doubts, setDoubts] = useState<any[]>([]);
-    const [doubtsLoading, setDoubtsLoading] = useState(false);
     const [isAskModalOpen, setIsAskModalOpen] = useState(false);
     const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
     const [copied, setCopied] = useState(false);
     const [doubtFilter, setDoubtFilter] = useState<'pending' | 'solved'>('pending');
-    const [tabCache, setTabCache] = useState<Record<string, any>>({});
+    const [searchVal, setSearchVal] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [subjectFilter, setSubjectFilter] = useState("All");
+    const [tagFilter, setTagFilter] = useState("");
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setSearchQuery(searchVal);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchVal]);
+
+    const type = activeTab === 'teacher-doubts' ? 'teacher' : activeTab === 'community' ? 'community' : 'ai';
+    const userName = typeof window !== 'undefined' ? localStorage.getItem("anonymous_user") : "";
+
+    const fetcher = (url: string) => fetch(url).then(res => res.json());
+    const getKey = (pageIndex: number, previousPageData: any[]) => {
+        if (previousPageData && !previousPageData.length) return null; // reached the end
+        if (activeTab === 'insights') return null;
+        const params = new URLSearchParams({
+            classroomId: String(id),
+            userName: userName || "",
+            type: String(type),
+            page: String(pageIndex + 1),
+            limit: "20"
+        });
+        if (tagFilter.trim()) params.append("tag", tagFilter.trim());
+        if (searchQuery) params.append("search", searchQuery);
+        if (subjectFilter !== "All") params.append("subject", subjectFilter);
+        return `/api/doubts?${params.toString()}`;
+    };
+
+    const { data, error, isLoading: doubtsLoading, size, setSize, mutate } = useSWRInfinite(getKey, fetcher, {
+        revalidateFirstPage: false
+    });
+
+    const doubts = data ? [].concat(...data) : [];
+    const isLoadingMore = doubtsLoading || (size > 0 && data && typeof data[size - 1] === "undefined");
+    const isReachingEnd = data && data[data.length - 1]?.length < 20;
+
+    const { ref: loadMoreRef, inView } = useInView();
+
+    useEffect(() => {
+        if (inView && !isReachingEnd && !isLoadingMore) {
+            setSize(size + 1);
+        }
+    }, [inView, isReachingEnd, isLoadingMore]);
+
+    useHotkeys("n", (e) => {
+        e.preventDefault();
+        setIsAskModalOpen(true);
+    }, {
+        enableOnFormTags: false,
+    });
 
     useEffect(() => {
         initialFetch();
@@ -73,20 +126,10 @@ export default function ClassroomPage() {
     const initialFetch = async () => {
         setLoading(true);
         try {
-            // Parallelize classroom data and initial Ask AI doubts
-            const [roomRes, doubtsRes] = await Promise.all([
-                fetch(`/api/rooms/${id}`),
-                fetch(`/api/doubts?classroomId=${id}&userName=${localStorage.getItem("anonymous_user")}&type=ai`)
-            ]);
-
+            const roomRes = await fetch(`/api/rooms/${id}`);
             const roomData = await roomRes.json();
-            const doubtsData = await doubtsRes.json();
-
             if (roomRes.ok) {
                 setClassroom(roomData);
-                const validatedDoubts = Array.isArray(doubtsData) ? doubtsData : [];
-                setTabCache(prev => ({ ...prev, "ask-ai": validatedDoubts }));
-                setDoubts(validatedDoubts);
             } else {
                 toast.error(roomData.error || "Error loading classroom");
                 router.push("/rooms");
@@ -109,69 +152,28 @@ export default function ClassroomPage() {
         }
     };
 
-    const fetchScopedDoubts = async (type: string = 'community') => {
-        setDoubtsLoading(true);
-        try {
-            const userName = localStorage.getItem("anonymous_user");
-            const params = new URLSearchParams({
-                classroomId: id as string,
-                userName: userName || "",
-                type: type
-            });
-            
-            if (searchQuery) params.append("search", searchQuery);
-            if (subjectFilter !== "All") params.append("subject", subjectFilter);
-
-            const res = await fetch(`/api/doubts?${params.toString()}`);
-            const data = await res.json();
-            if (res.ok && Array.isArray(data)) {
-                setDoubts(data);
-                if (!searchQuery && subjectFilter === "All") {
-                    setTabCache(prev => ({ ...prev, [activeTab]: data }));
-                }
-            } else {
-                console.error("Invalid doubts data received:", data);
-                setDoubts([]);
-                if (data?.error) toast.error(data.error);
-            }
-        } catch (err) {
-            toast.error("Failed to load doubts");
-        } finally {
-            setDoubtsLoading(false);
-        }
-    };
-
     useEffect(() => {
-        // Don't refetch if we have a cache AND it's not Insights (insights are dynamic/real-time)
-        // AND no filters are active
-        if (activeTab === "insights") return; 
+        // SWR will handle refetching automatically when the key changes.
+        // We can still call mutate() if we want to force a refresh.
+        mutate();
+    }, [activeTab, tagFilter, searchQuery, subjectFilter]);
 
-        if (tabCache[activeTab] && !searchQuery && subjectFilter === "All") {
-            setDoubts(tabCache[activeTab]);
-            return;
-        }
-
-        const type = activeTab === 'teacher-doubts' ? 'teacher' : activeTab === 'community' ? 'community' : 'ai';
-        
-        const delayDebounceFn = setTimeout(() => {
-            fetchScopedDoubts(type);
-        }, 500);
-
-        return () => clearTimeout(delayDebounceFn);
-    }, [activeTab, searchQuery, subjectFilter]);
-
-    const copyCode = () => {
+    const copyCode = async () => {
         if (classroom?.inviteCode) {
-            navigator.clipboard.writeText(classroom.inviteCode);
-            setCopied(true);
-            toast.success("Invite code copied!");
-            setTimeout(() => setCopied(false), 2000);
+            try {
+                await navigator.clipboard.writeText(classroom.inviteCode);
+                setCopied(true);
+                toast.success("Invite code copied!", { id: `copy-invite-${classroom.inviteCode}` });
+                setTimeout(() => setCopied(false), 2000);
+            } catch (err) {
+                toast.error("Failed to copy invite code", { id: `copy-invite-error-${classroom.inviteCode}` });
+            }
         }
     };
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#020617] flex items-center justify-center">
+            <div className="h-[calc(100vh-80px)] flex items-center justify-center">
                 <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
             </div>
         );
@@ -180,49 +182,56 @@ export default function ClassroomPage() {
     if (!classroom) return null;
 
     return (
-        <div className="min-h-screen bg-[#020617] text-white">
+        <div className="relative overflow-hidden">
             {/* Header / Banner */}
-            <div className="sticky top-0 z-50 bg-[#020617]/80 backdrop-blur-xl border-b border-white/5 pt-6 pb-6 px-6 md:px-12 relative overflow-hidden">
+            <div className="sticky top-0 z-50 bg-white/80 dark:bg-[#020617]/80 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6 md:px-12 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-600/5 blur-[120px] rounded-full translate-x-1/3 -translate-y-1/3" />
-                
+
                 <div className="max-w-7xl mx-auto relative z-10">
-                    <div className="flex items-center justify-between mb-2">
-                        <button 
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                        <button
                             onClick={() => router.push("/rooms")}
-                            className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-xs font-black uppercase tracking-widest"
+                            className="flex items-center gap-2 text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors text-xs font-black uppercase tracking-widest w-fit shrink-0"
                         >
                             <ChevronLeft className="w-4 h-4" /> Back to Campus
                         </button>
 
-                        <button 
-                            onClick={() => setIsCodeModalOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/10 hover:text-white transition-all shadow-inner"
-                        >
-                            <Sparkles className="w-3.5 h-3.5 text-blue-400" /> Class Code
-                        </button>
+                        <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto justify-start sm:justify-end">
+                            <ExportButton 
+                                classroomId={String(id)} 
+                                classroomName={classroom?.name || ""} 
+                                isTeacher={classroom?.role === "teacher"} 
+                            />
+                            <button
+                                onClick={() => setIsCodeModalOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition-all shadow-inner shrink-0"
+                            >
+                                <Sparkles className="w-3.5 h-3.5 text-blue-400" /> Class Code
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mt-4">
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center text-3xl font-black italic">
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mt-4 min-w-0">
+                        <div className="space-y-4 min-w-0">
+                            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl font-black italic shrink-0">
                                     {classroom.name.charAt(0)}
                                 </div>
-                                <div>
-                                    <h1 className="text-5xl font-black uppercase italic tracking-tighter">
+                                <div className="min-w-0 flex-1">
+                                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase italic tracking-tighter truncate sm:overflow-visible sm:whitespace-normal">
                                         {classroom.name}
                                     </h1>
-                                    <div className="flex items-center gap-4 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-2">
-                                        <span className="flex items-center gap-1.5"><School className="w-3.5 h-3.5" /> {classroom.university}</span>
-                                        <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {classroom.year}</span>
-                                        <span className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md border border-white/10">{classroom.role}</span>
+                                    <div className="flex items-center gap-2 sm:gap-4 flex-wrap text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-2">
+                                        <span className="flex items-center gap-1.5"><School className="w-3.5 h-3.5 shrink-0" /> {classroom.university}</span>
+                                        <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 shrink-0" /> {classroom.year}</span>
+                                        <span className="flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-md border border-slate-200 dark:border-white/10">{classroom.role}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Navigation Tabs */}
-                        <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-hide">
+                        <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap scroll-smooth pb-2 scrollbar-hide w-full xl:w-auto max-w-full">
                             {[
                                 { id: "ask-ai", label: "Ask AI", icon: Brain },
                                 { id: "community", label: "Community", icon: MessageSquare },
@@ -232,13 +241,9 @@ export default function ClassroomPage() {
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border shrink-0 ${
-                                        activeTab === tab.id 
-                                        ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20" 
-                                        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white"
-                                    }`}
+                                    className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border shrink-0 whitespace-nowrap ${ activeTab === tab.id ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20" : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white" }`}
                                 >
-                                    <tab.icon className="w-4 h-4" /> {tab.label}
+                                    <tab.icon className="w-4 h-4 shrink-0" /> {tab.label}
                                 </button>
                             ))}
                         </div>
@@ -255,7 +260,7 @@ export default function ClassroomPage() {
                             <div className="max-w-3xl mx-auto">
                                 <AskAIView 
                                     classroomId={Number(id)} 
-                                    onSuccess={() => fetchScopedDoubts('ai')} 
+                                    onSuccess={() => mutate()} 
                                     initialDoubt={activeAIDoubt}
                                 />
                             </div>
@@ -276,11 +281,11 @@ export default function ClassroomPage() {
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     {Array.isArray(doubts) && doubts.filter((d: any) => d.type === 'ai').map((doubt: any) => (
-                                        <DoubtCard 
-                                            key={doubt.id} 
-                                            doubt={doubt} 
-                                            role={classroom?.role} 
-                                            onUpdate={() => fetchScopedDoubts('ai')} 
+                                        <DoubtCard
+                                            key={doubt.id}
+                                            doubt={doubt}
+                                            role={classroom?.role}
+                                            onUpdate={() => mutate()}
                                             onViewAISolution={(d) => {
                                                 setActiveAIDoubt(d);
                                                 setActiveTab("ask-ai");
@@ -288,7 +293,7 @@ export default function ClassroomPage() {
                                         />
                                     ))}
                                     {Array.isArray(doubts) && doubts.filter((d: any) => d.type === 'ai').length === 0 && (
-                                        <div className="col-span-full py-12 text-center text-slate-500 text-xs font-bold uppercase tracking-widest opacity-30">
+                                        <div className="col-span-full py-12 text-center text-slate-500 dark:text-slate-500 text-xs font-bold uppercase tracking-widest opacity-30">
                                             No resolved AI queries in this classroom yet.
                                         </div>
                                     )}
@@ -300,33 +305,43 @@ export default function ClassroomPage() {
 
                 {activeTab === "community" && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-12">
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 bg-white/[0.02] border border-white/5 p-4 rounded-[2rem]">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 bg-white/[0.02] border border-slate-200 dark:border-white/5 p-4 rounded-[2rem]">
                             <h2 className="text-2xl font-black uppercase italic tracking-tight px-4">Classroom <span className="text-blue-500">Board</span></h2>
-                            
-                            <div className="flex items-center gap-2 bg-slate-950/50 p-1.5 rounded-2xl border border-white/5">
-                                <button 
+
+                            <div className="flex items-center gap-2 bg-white/50 dark:bg-slate-950/50 p-1.5 rounded-2xl border border-slate-200 dark:border-white/5">
+                                <button
                                     onClick={() => setDoubtFilter('pending')}
-                                    className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                                        doubtFilter === 'pending' 
-                                        ? "bg-red-500/10 text-red-500 border border-red-500/20" 
-                                        : "text-slate-500 hover:text-white"
-                                    }`}
+                                    className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${ doubtFilter === 'pending' ? "bg-red-500/10 text-red-500 border border-red-500/20" : "text-slate-500 hover:text-white" }`}
                                 >
-                                    Pending 
+                                    Pending
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => setDoubtFilter('solved')}
-                                    className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                                        doubtFilter === 'solved' 
-                                        ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
-                                        : "text-slate-500 hover:text-white"
-                                    }`}
+                                    className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${ doubtFilter === 'solved' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "text-slate-500 hover:text-white" }`}
                                 >
                                     Resolved
                                 </button>
                             </div>
 
-                            <button 
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={tagFilter}
+                                    onChange={(e) => setTagFilter(e.target.value)}
+                                    placeholder="Filter tag"
+                                    className="w-32 bg-white/50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-[10px] font-bold text-slate-900 dark:text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                                />
+                                {tagFilter && (
+                                    <button
+                                        onClick={() => setTagFilter("")}
+                                        className="text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
+
+                            <button
                                 onClick={() => setIsAskModalOpen(true)}
                                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center gap-2 shrink-0"
                             >
@@ -341,8 +356,8 @@ export default function ClassroomPage() {
                                 <input 
                                     type="text"
                                     placeholder="Search classroom board..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    value={searchVal}
+                                    onChange={(e) => setSearchVal(e.target.value)}
                                     className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-[11px] font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 transition-all shadow-inner"
                                 />
                             </div>
@@ -368,12 +383,12 @@ export default function ClassroomPage() {
                                 <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
                             </div>
                         ) : doubts.length === 0 ? (
-                            <div className="py-24 text-center space-y-6 bg-white/[0.02] border border-dashed border-white/10 rounded-[3rem] animate-in fade-in duration-500">
+                            <div className="py-24 text-center space-y-6 bg-slate-100 dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-[3rem] animate-in fade-in duration-500">
                                 <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mx-auto mb-2 border border-white/5">
-                                    <MessageSquare className="w-10 h-10 text-slate-700" />
+                                    <MessageSquare className="w-10 h-10 text-slate-700 mx-auto" />
                                 </div>
                                 <div className="space-y-2">
-                                    <h3 className="text-xl font-black uppercase italic tracking-tight">
+                                    <h3 className="text-xl font-black uppercase italic tracking-tight text-slate-900 dark:text-white">
                                         {searchQuery ? "No matching doubts" : "No community posts yet."}
                                     </h3>
                                     <p className="text-slate-500 font-medium text-xs max-w-xs mx-auto leading-relaxed">
@@ -384,13 +399,13 @@ export default function ClassroomPage() {
                                 </div>
                                 {searchQuery ? (
                                     <button 
-                                        onClick={() => setSearchQuery("")}
-                                        className="px-8 py-3 bg-white/5 hover:bg-white text-slate-400 hover:text-slate-950 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                        onClick={() => setSearchVal("")}
+                                        className="px-8 py-3 bg-white/5 hover:bg-slate-200 dark:hover:bg-white text-slate-500 hover:text-slate-950 dark:hover:text-slate-950 border border-slate-200 dark:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all mx-auto block"
                                     >
                                         Clear Search
                                     </button>
                                 ) : (
-                                    <button onClick={() => setIsAskModalOpen(true)} className="text-blue-500 font-black uppercase tracking-widest text-[10px] hover:underline underline-offset-4">Be the first to ask</button>
+                                    <button onClick={() => setIsAskModalOpen(true)} className="text-blue-500 font-black uppercase tracking-widest text-[10px] hover:underline underline-offset-4 mx-auto block">Be the first to ask</button>
                                 )}
                             </div>
                         ) : (
@@ -404,10 +419,10 @@ export default function ClassroomPage() {
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             {Array.isArray(doubts) && doubts.filter((d: any) => d.isSolved !== "solved").map((doubt: any) => (
-                                                <DoubtCard key={doubt.id} doubt={doubt} role={classroom?.role} onUpdate={() => fetchScopedDoubts('community')} />
+                                                <DoubtCard key={doubt.id} doubt={doubt} role={classroom?.role} onUpdate={() => mutate()} />
                                              ))}
                                             {(!Array.isArray(doubts) || doubts.filter((d: any) => d.isSolved !== "solved").length === 0) && (
-                                                <div className="col-span-full py-12 text-center text-slate-500 text-[10px] uppercase font-black tracking-widest opacity-40">
+                                                <div className="col-span-full py-12 text-center text-slate-500 dark:text-slate-500 text-[10px] uppercase font-black tracking-widest opacity-40">
                                                     No pending queries in this category.
                                                 </div>
                                             )}
@@ -422,10 +437,10 @@ export default function ClassroomPage() {
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             {Array.isArray(doubts) && doubts.filter((d: any) => d.isSolved === "solved").map((doubt: any) => (
-                                                <DoubtCard key={doubt.id} doubt={doubt} role={classroom?.role} onUpdate={() => fetchScopedDoubts('community')} />
+                                                <DoubtCard key={doubt.id} doubt={doubt} role={classroom?.role} onUpdate={() => mutate()} />
                                             ))}
                                             {(!Array.isArray(doubts) || doubts.filter((d: any) => d.isSolved === "solved").length === 0) && (
-                                                <div className="col-span-full py-12 text-center text-slate-500 text-[10px] uppercase font-black tracking-widest opacity-40">
+                                                <div className="col-span-full py-12 text-center text-slate-500 dark:text-slate-500 text-[10px] uppercase font-black tracking-widest opacity-40">
                                                     No resolved queries yet.
                                                 </div>
                                             )}
@@ -439,36 +454,46 @@ export default function ClassroomPage() {
 
                 {activeTab === "teacher-doubts" && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-12">
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 bg-white/[0.02] border border-white/5 p-4 rounded-[2rem]">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 bg-white/[0.02] border border-slate-200 dark:border-white/5 p-4 rounded-[2rem]">
                             <h2 className="text-2xl font-black uppercase italic tracking-tight px-4">
                                 {classroom?.role === 'teacher' ? <><span className="text-purple-500">Students</span> Doubts</> : <>Direct <span className="text-purple-500">Teacher Doubts</span></>}
                             </h2>
 
-                            <div className="flex items-center gap-2 bg-slate-950/50 p-1.5 rounded-2xl border border-white/5">
-                                <button 
+                            <div className="flex items-center gap-2 bg-white/50 dark:bg-slate-950/50 p-1.5 rounded-2xl border border-slate-200 dark:border-white/5">
+                                <button
                                     onClick={() => setDoubtFilter('pending')}
-                                    className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                                        doubtFilter === 'pending' 
-                                        ? "bg-red-500/10 text-red-500 border border-red-500/20" 
-                                        : "text-slate-500 hover:text-white"
-                                    }`}
+                                    className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${ doubtFilter === 'pending' ? "bg-red-500/10 text-red-500 border border-red-500/20" : "text-slate-500 hover:text-white" }`}
                                 >
-                                    Pending 
+                                    Pending
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => setDoubtFilter('solved')}
-                                    className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                                        doubtFilter === 'solved' 
-                                        ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
-                                        : "text-slate-500 hover:text-white"
-                                    }`}
+                                    className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${ doubtFilter === 'solved' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "text-slate-500 hover:text-white" }`}
                                 >
                                     Resolved
                                 </button>
                             </div>
 
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={tagFilter}
+                                    onChange={(e) => setTagFilter(e.target.value)}
+                                    placeholder="Filter tag"
+                                    className="w-32 bg-white/50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-[10px] font-bold text-slate-900 dark:text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500/50"
+                                />
+                                {tagFilter && (
+                                    <button
+                                        onClick={() => setTagFilter("")}
+                                        className="text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
+
                             {classroom?.role !== 'teacher' && (
-                                <button 
+                                <button
                                     onClick={() => setIsAskModalOpen(true)}
                                     className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center gap-2 shrink-0"
                                 >
@@ -484,8 +509,8 @@ export default function ClassroomPage() {
                                 <input 
                                     type="text"
                                     placeholder="Search teacher queries..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    value={searchVal}
+                                    onChange={(e) => setSearchVal(e.target.value)}
                                     className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-[11px] font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500/50 transition-all shadow-inner"
                                 />
                             </div>
@@ -521,12 +546,12 @@ export default function ClassroomPage() {
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             {Array.isArray(doubts) && doubts.filter((d: any) => d.isSolved !== "solved").map((doubt: any) => (
-                                                <DoubtCard key={doubt.id} doubt={doubt} role={classroom?.role} onUpdate={() => fetchScopedDoubts('teacher')} />
+                                                <DoubtCard key={doubt.id} doubt={doubt} role={classroom?.role} onUpdate={() => mutate()} />
                                             ))}
                                             {(!Array.isArray(doubts) || doubts.filter((d: any) => d.isSolved !== "solved").length === 0) && (
-                                                <div className="col-span-full py-24 text-center space-y-4 bg-white/5 border border-dashed border-white/10 rounded-[2.5rem]">
+                                                <div className="col-span-full py-24 text-center space-y-4 bg-slate-100 dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-[2.5rem]">
                                                     <GraduationCap className="w-12 h-12 text-slate-700 mx-auto" />
-                                                    <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">
+                                                    <p className="text-slate-500 dark:text-slate-500 font-bold uppercase tracking-widest text-xs">
                                                         {classroom?.role === 'teacher' ? "No doubts from students yet." : "No teacher doubts yet."}
                                                     </p>
                                                     {classroom?.role !== 'teacher' && (
@@ -545,10 +570,10 @@ export default function ClassroomPage() {
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             {Array.isArray(doubts) && doubts.filter((d: any) => d.isSolved === "solved").map((doubt: any) => (
-                                                <DoubtCard key={doubt.id} doubt={doubt} role={classroom?.role} onUpdate={() => fetchScopedDoubts('teacher')} />
+                                                <DoubtCard key={doubt.id} doubt={doubt} role={classroom?.role} onUpdate={() => mutate()} />
                                             ))}
                                             {(!Array.isArray(doubts) || doubts.filter((d: any) => d.isSolved === "solved").length === 0) && (
-                                                <div className="col-span-full py-12 text-center text-slate-500 text-[10px] uppercase font-black tracking-widest opacity-40">
+                                                <div className="col-span-full py-12 text-center text-slate-500 dark:text-slate-500 text-[10px] uppercase font-black tracking-widest opacity-40">
                                                     No resolved queries yet.
                                                 </div>
                                             )}
@@ -566,16 +591,21 @@ export default function ClassroomPage() {
                          <ClassroomInsightsView classroomId={Number(id)} role={classroom?.role} />
                     </div>
                 )}
+
+                {activeTab !== 'insights' && (
+                    <div ref={loadMoreRef} className="py-8 flex justify-center">
+                        {isLoadingMore && <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />}
+                    </div>
+                )}
             </div>
 
             {isAskModalOpen && (
-                <AskDoubt 
+                <AskDoubt
                     isOpen={isAskModalOpen}
                     onClose={() => setIsAskModalOpen(false)}
                     onSuccess={() => {
                         setIsAskModalOpen(false);
-                        const type = activeTab === 'teacher-doubts' ? 'teacher' : activeTab === 'ask-ai' ? 'ai' : 'community';
-                        fetchScopedDoubts(type);
+                        mutate();
                     }}
                     classroomId={Number(id)}
                     type={activeTab === 'teacher-doubts' ? 'teacher' : activeTab === 'ask-ai' ? 'ai' : 'community'}
@@ -585,34 +615,35 @@ export default function ClassroomPage() {
 
             {/* CLASS CODE MODAL */}
             {isCodeModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-xl bg-[#020617]/80 animate-in fade-in duration-300">
-                    <div className="bg-[#0f172a] border border-white/10 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-300 relative overflow-hidden">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-xl bg-white/80 dark:bg-[#020617]/80 animate-in fade-in duration-300">
+                    <div className="bg-[#0f172a] border border-slate-200 dark:border-white/10 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-300 relative overflow-hidden">
                          <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-blue-500 to-transparent"></div>
                          <div className="flex items-center justify-between">
                             <div className="space-y-1">
                                 <h2 className="text-2xl font-black uppercase tracking-tighter">Access <span className="text-blue-500">Key</span></h2>
-                                <p className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">Invite your students</p>
+                                <p className="text-slate-500 dark:text-slate-500 font-bold uppercase tracking-widest text-[9px]">Invite your students</p>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => setIsCodeModalOpen(false)}
-                                className="p-2 text-slate-500 hover:text-white transition-colors"
+                                className="p-2 text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+                                aria-label="Close modal"
                             >
                                 <Plus className="w-5 h-5 rotate-45" />
                             </button>
                         </div>
 
-                        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex items-center justify-between gap-6 relative group overflow-hidden">
+                        <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 flex items-center justify-between gap-6 relative group overflow-hidden">
                             <div className="absolute inset-0 bg-blue-600/5 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             <code className="text-4xl font-black text-blue-400 tracking-[0.2em] relative z-10">{classroom?.inviteCode}</code>
-                            
-                            <button 
+
+                            <button
                                 onClick={copyCode}
                                 className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all shadow-xl shadow-blue-600/20 active:scale-[0.98] relative z-10"
                             >
                                 {copied ? (
-                                    <><Check className="w-4 h-4 text-white" /> Copied!</>
+                                    <><Check className="w-4 h-4 text-slate-900 dark:text-white" /> Copied!</>
                                 ) : (
-                                    <><Copy className="w-4 h-4 text-white" /> Copy Code</>
+                                    <><Copy className="w-4 h-4 text-slate-900 dark:text-white" /> Copy Code</>
                                 )}
                             </button>
                         </div>
@@ -662,11 +693,12 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
             <div className="flex items-center justify-between px-2">
                 <div className="space-y-1">
                     <h2 className="text-3xl font-black uppercase italic tracking-tighter">Live Classroom <span className="text-blue-500">Pulse</span></h2>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Real-time pedagogical analytics & student engagement</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-500">Real-time pedagogical analytics & student engagement</p>
                 </div>
-                <button 
+                <button
                     onClick={fetchData}
-                    className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-blue-400 transition-all group"
+                    disabled={loading}
+                    className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-white/10 hover:text-blue-400 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Activity className={`w-3.5 h-3.5 ${loading ? 'animate-pulse text-blue-500' : 'group-hover:rotate-12'} transition-all`} />
                     {loading ? 'Analyzing...' : 'Refresh Data'}
@@ -680,13 +712,13 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
                     { label: "Total Queries", value: data?.engagement?.totalDoubts || 0, icon: MessageSquare, color: "purple" },
                     { label: "Community Wisdom", value: data?.engagement?.totalReplies || 0, icon: Activity, color: "emerald" },
                 ].map((stat, i) => (
-                    <div key={i} className="bg-white/5 border border-white/10 rounded-[2rem] p-8 flex items-center justify-between group hover:bg-white/[0.07] transition-all">
+                    <div key={i} className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[2rem] p-8 flex items-center justify-between group hover:bg-white/[0.07] transition-all">
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">{stat.label}</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-500 mb-1">{stat.label}</p>
                             <h4 className="text-4xl font-black italic tracking-tighter">{stat.value}</h4>
                         </div>
-                        <div className={`w-14 h-14 rounded-2xl bg-${stat.color}-500/10 flex items-center justify-center border border-${stat.color}-500/20 group-hover:scale-110 transition-transform`}>
-                            <stat.icon className={`w-6 h-6 text-${stat.color}-500`} />
+                        <div className={`w-14 h-14 rounded-2xl bg- ${stat.color} -500/10 flex items-center justify-center border border- ${stat.color} -500/20 group-hover:scale-110 transition-transform`}>
+                            <stat.icon className={`w-6 h-6 text- ${stat.color} -500`} />
                         </div>
                     </div>
                 ))}
@@ -694,31 +726,27 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                 {/* 2. Difficulty Heatmap / Most Confusing Topics */}
-                <div className="bg-white/5 border border-white/10 rounded-[3rem] p-10 space-y-8">
+                <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[3rem] p-10 space-y-8">
                     <div className="flex items-center justify-between">
                         <h3 className="text-xl font-black uppercase italic tracking-tight flex items-center gap-3">
                             <Layers className="w-5 h-5 text-orange-500" /> Topic Difficulty Heatmap
                         </h3>
-                        <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">By Doubt Volume</span>
+                        <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-500 tracking-widest">By Doubt Volume</span>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         {data?.mostAskedTopics.map((topic: any, i: number) => {
                             const intensity = Math.min(Number(topic.count) * 10, 100);
                             return (
-                                <div key={i} className="p-4 rounded-2xl border border-white/5 relative overflow-hidden group">
-                                    <div 
-                                        className="absolute inset-0 bg-red-500 transition-opacity duration-500 pointer-events-none" 
-                                        style={{ opacity: intensity / 300 }} 
+                                <div key={i} className="p-4 rounded-2xl border border-slate-200 dark:border-white/5 relative overflow-hidden group">
+                                    <div
+                                        className="absolute inset-0 bg-red-500 transition-opacity duration-500 pointer-events-none"
+                                        style={{ opacity: intensity / 300 }}
                                     />
                                     <div className="relative z-10 space-y-2">
-                                        <p className="text-sm font-bold text-white uppercase tracking-tight">{topic.subject}</p>
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">{topic.subject}</p>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{topic.count} Doubts</span>
-                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
-                                                topic.severity === 'High' ? 'bg-red-500/20 text-red-500' : 
-                                                topic.severity === 'Medium' ? 'bg-orange-500/20 text-orange-500' : 
-                                                'bg-emerald-500/20 text-emerald-500'
-                                            }`}>
+                                            <span className="text-[9px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">{topic.count} Doubts</span>
+                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${ topic.severity === 'High' ? 'bg-red-500/20 text-red-500' : topic.severity === 'Medium' ? 'bg-orange-500/20 text-orange-500' : 'bg-emerald-500/20 text-emerald-500' }`}>
                                                 {topic.severity}
                                             </span>
                                         </div>
@@ -730,7 +758,7 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
                 </div>
 
                 {/* 3. Resolved vs Unresolved Doubts */}
-                <div className="bg-white/5 border border-white/10 rounded-[3rem] p-10 space-y-10">
+                <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[3rem] p-10 space-y-10">
                     <h3 className="text-xl font-black uppercase italic tracking-tight flex items-center gap-3">
                         <PieChart className="w-5 h-5 text-emerald-500" /> Resolution Pulse
                     </h3>
@@ -738,8 +766,8 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
                         <div className="relative w-48 h-48 flex items-center justify-center">
                             <svg className="w-full h-full transform -rotate-90">
                                 <circle cx="96" cy="96" r="80" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-white/5" />
-                                <circle 
-                                    cx="96" cy="96" r="80" stroke="currentColor" strokeWidth="12" fill="transparent" 
+                                <circle
+                                    cx="96" cy="96" r="80" stroke="currentColor" strokeWidth="12" fill="transparent"
                                     strokeDasharray={2 * Math.PI * 80}
                                     strokeDashoffset={2 * Math.PI * 80 * (1 - solvedPercentage / 100)}
                                     strokeLinecap="round"
@@ -748,7 +776,7 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
                                 <span className="text-4xl font-black italic tracking-tighter">{Math.round(solvedPercentage)}%</span>
-                                <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Resolved</span>
+                                <span className="text-[9px] font-black uppercase text-slate-500 dark:text-slate-500 tracking-widest">Resolved</span>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-12 w-full max-w-xs">
@@ -766,20 +794,20 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
             </div>
 
             {/* Top Contributors Leaderboard */}
-            <div className="bg-gradient-to-br from-amber-500/5 via-white/5 to-yellow-500/5 border border-white/10 rounded-[3rem] p-10 space-y-8 relative overflow-hidden group">
+            <div className="bg-gradient-to-br from-amber-500/5 via-white/5 to-yellow-500/5 border border-slate-200 dark:border-white/10 rounded-[3rem] p-10 space-y-8 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 blur-[100px] rounded-full translate-x-1/3 -translate-y-1/3 group-hover:bg-amber-500/10 transition-all duration-700" />
                 <div className="flex items-center justify-between relative z-10">
                     <h3 className="text-xl font-black uppercase italic tracking-tight flex items-center gap-3">
                         <Trophy className="w-5 h-5 text-amber-400" /> Top Contributors
                     </h3>
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Community Heroes</span>
+                    <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-500 tracking-widest">Community Heroes</span>
                 </div>
                 {data?.topContributors && data.topContributors.length > 0 ? (
                     <div className="space-y-3 relative z-10">
                         {(() => {
                             const rankStyles = [
                                 { bg: 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20', border: 'border-amber-500/30', text: 'text-amber-400', icon: <Trophy className="w-5 h-5 text-amber-400" />, glow: 'shadow-lg shadow-amber-500/10' },
-                                { bg: 'bg-gradient-to-r from-slate-300/10 to-slate-400/10', border: 'border-slate-400/20', text: 'text-slate-300', icon: <Medal className="w-5 h-5 text-slate-300" />, glow: '' },
+                                { bg: 'bg-gradient-to-r from-slate-300/10 to-slate-400/10', border: 'border-slate-400/20', text: 'text-slate-300', icon: <Medal className="w-5 h-5 text-slate-700 dark:text-slate-300" />, glow: '' },
                                 { bg: 'bg-gradient-to-r from-orange-700/10 to-orange-600/10', border: 'border-orange-700/20', text: 'text-orange-400', icon: <Medal className="w-5 h-5 text-orange-400" />, glow: '' },
                             ];
                             return data.topContributors.map((contributor: any, i: number) => {
@@ -796,7 +824,7 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
                                             <p className={`text-sm font-black uppercase tracking-tight truncate ${i === 0 ? 'text-amber-300' : 'text-white'}`}>
                                                 {contributor.name}
                                             </p>
-                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mt-0.5">
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-500 mt-0.5">
                                                 {i === 0 ? '👑 Top Helper' : i === 1 ? '🥈 Rising Star' : i === 2 ? '🥉 Consistent' : `Rank #${i + 1}`}
                                             </p>
                                         </div>
@@ -812,20 +840,20 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
                 ) : (
                     <div className="py-12 text-center space-y-3 relative z-10">
                         <Trophy className="w-10 h-10 text-slate-700 mx-auto" />
-                        <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">No community replies yet. Be the first to help!</p>
+                        <p className="text-slate-500 dark:text-slate-500 font-bold uppercase tracking-widest text-xs">No community replies yet. Be the first to help!</p>
                     </div>
                 )}
             </div>
 
             {/* 4. Peak Doubt Time Heatmap */}
-            <div className="bg-white/5 border border-white/10 rounded-[3rem] p-10 space-y-8">
+            <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[3rem] p-10 space-y-8">
                 <div className="flex items-center justify-between">
                     <h3 className="text-xl font-black uppercase italic tracking-tight flex items-center gap-3">
                         <Clock className="w-5 h-5 text-purple-500" /> Peak Activity Timeline
                     </h3>
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                        <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Student Activity Hours</span>
+                        <span className="text-[9px] font-black uppercase text-slate-500 dark:text-slate-500 tracking-widest">Student Activity Hours</span>
                     </div>
                 </div>
                 <div className="grid grid-cols-24 gap-1 h-32 items-end pt-4">
@@ -834,11 +862,11 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
                         const heightPercentage = Math.min((activity / 10) * 100, 100);
                         return (
                             <div key={hour} className="group relative flex flex-col items-center gap-2">
-                                <div 
-                                    className="w-full bg-gradient-to-t from-purple-600 to-blue-400 rounded-t-md hover:from-white hover:to-white transition-all duration-500" 
+                                <div
+                                    className="w-full bg-gradient-to-t from-purple-600 to-blue-400 rounded-t-md hover:from-white hover:to-white transition-all duration-500"
                                     style={{ height: `${Math.max(heightPercentage, 2)}%` }}
                                 />
-                                <span className="text-[7px] font-black text-slate-600 uppercase group-hover:text-white transition-colors">
+                                <span className="text-[7px] font-black text-slate-600 uppercase group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
                                     {hour}h
                                 </span>
                                 {/* Tooltip */}
@@ -859,18 +887,16 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {data?.mostAskedTopics.filter((t: any) => t.severity !== 'Low').length > 0 ? (
                         data?.mostAskedTopics.filter((t: any) => t.severity !== 'Low').map((topic: any, i: number) => (
-                            <div key={i} className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-white/10 rounded-[2.5rem] p-8 flex items-start gap-6 relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 p-4 border-l border-b border-white/5 bg-white/5 rounded-bl-3xl">
+                            <div key={i} className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-8 flex items-start gap-6 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-4 border-l border-b border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 rounded-bl-3xl">
                                     <Lightbulb className="w-5 h-5 text-yellow-400" />
                                 </div>
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                                    topic.severity === 'High' ? 'bg-red-500/20 text-red-500' : 'bg-orange-500/20 text-orange-500'
-                                }`}>
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${ topic.severity === 'High' ? 'bg-red-500/20 text-red-500' : 'bg-orange-500/20 text-orange-500' }`}>
                                     <AlertTriangle className="w-6 h-6" />
                                 </div>
                                 <div className="space-y-3">
                                     <h4 className="text-lg font-black uppercase italic tracking-tight">{topic.subject} struggle detected</h4>
-                                    <p className="text-sm text-slate-400 leading-relaxed font-medium">
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
                                         {topic.suggestion}
                                     </p>
                                     <div className="pt-2">
@@ -882,9 +908,9 @@ function ClassroomInsightsView({ classroomId, role }: { classroomId: number, rol
                             </div>
                         ))
                     ) : (
-                        <div className="col-span-full py-16 text-center bg-white/5 border border-dashed border-white/10 rounded-[3rem] space-y-4">
+                        <div className="col-span-full py-16 text-center bg-slate-100 dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-[3rem] space-y-4">
                             <Sparkles className="w-10 h-10 text-emerald-500 mx-auto" />
-                            <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Curriculum looks healthy. No major Concept blockers detected.</p>
+                            <p className="text-slate-500 dark:text-slate-500 font-bold uppercase tracking-widest text-xs">Curriculum looks healthy. No major Concept blockers detected.</p>
                         </div>
                     )}
                 </div>
@@ -908,17 +934,17 @@ function PersonalMentorView({ classroomId }: { classroomId: number }) {
     }, [classroomId]);
 
     if (loading) return (
-        <div className="bg-white/5 border border-white/10 rounded-[3rem] p-12 text-center">
+        <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[3rem] p-12 text-center">
             <Loader2 className="w-10 h-10 text-blue-500 animate-spin mx-auto mb-4" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Consulting AI Learning Mentor...</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-500">Consulting AI Learning Mentor...</p>
         </div>
     );
 
     if (!personalData?.isEngaged) return (
-        <div className="bg-gradient-to-br from-blue-600/5 to-purple-600/5 border border-dashed border-white/10 rounded-[3rem] p-12 text-center space-y-4">
+        <div className="bg-gradient-to-br from-blue-600/5 to-purple-600/5 border border-dashed border-slate-200 dark:border-white/10 rounded-[3rem] p-12 text-center space-y-4">
             <Sparkles className="w-12 h-12 text-blue-500/30 mx-auto" />
             <h3 className="text-xl font-black uppercase italic tracking-tight text-white/80">Unlock Your <span className="text-blue-500">AI Mentor</span></h3>
-            <p className="text-sm text-slate-500 max-w-md mx-auto leading-relaxed font-medium">
+            <p className="text-sm text-slate-500 dark:text-slate-500 max-w-md mx-auto leading-relaxed font-medium">
                 {personalData?.message || "Ask more doubts to unlock personalized AI Weak Topic Detection!"}
             </p>
         </div>
@@ -931,12 +957,12 @@ function PersonalMentorView({ classroomId }: { classroomId: number }) {
                 <div className="bg-slate-950/40 backdrop-blur-xl rounded-[2.9rem] p-6 md:p-10 flex flex-col md:flex-row items-center gap-8 overflow-hidden relative">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 blur-[100px] rounded-full -mr-32 -mt-32"></div>
                     <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-600/10 blur-[100px] rounded-full -ml-32 -mb-32"></div>
-                    
+
                     <div className="relative shrink-0">
                         <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-[2rem] flex items-center justify-center shadow-2xl relative z-10 group">
-                            <Brain className="w-12 h-12 text-white group-hover:scale-110 transition-transform duration-500" />
+                            <Brain className="w-12 h-12 text-slate-900 dark:text-white group-hover:scale-110 transition-transform duration-500" />
                         </div>
-                        <div className="absolute -top-4 -right-4 bg-emerald-500 text-white text-[8px] font-black uppercase px-3 py-1.5 rounded-full border-4 border-slate-950 shadow-xl z-20 animate-bounce">Live Mentor</div>
+                        <div className="absolute -top-4 -right-4 bg-emerald-500 text-slate-900 dark:text-white text-[8px] font-black uppercase px-3 py-1.5 rounded-full border-4 border-slate-950 shadow-xl z-20 animate-bounce">Live Mentor</div>
                     </div>
                     <div className="space-y-4 flex-1 text-center md:text-left relative z-10">
                         <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-full mb-2">
@@ -944,7 +970,7 @@ function PersonalMentorView({ classroomId }: { classroomId: number }) {
                             <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Personalized Strategy</span>
                         </div>
                         <h3 className="text-3xl font-black uppercase italic tracking-tighter">Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Learning Mentor</span> Insight</h3>
-                        <p className="text-lg text-slate-300 font-medium leading-relaxed italic border-l-2 border-blue-500/30 pl-6 py-2">
+                        <p className="text-lg text-slate-700 dark:text-slate-300 font-medium leading-relaxed italic border-l-2 border-blue-500/30 pl-6 py-2">
                            "{personalData.insight}"
                         </p>
                     </div>
@@ -955,24 +981,24 @@ function PersonalMentorView({ classroomId }: { classroomId: number }) {
                 {/* Weak Topics */}
                 <div className="space-y-6">
                     <div className="flex items-center justify-between px-2">
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 flex items-center gap-3">
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 dark:text-slate-500 flex items-center gap-3">
                             <Target className="w-4 h-4 text-red-500" /> Improvement Targets
                         </h4>
                         <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">High Priority</span>
                     </div>
                     <div className="grid gap-4">
                         {personalData.weakTopics.map((topic: any, i: number) => (
-                            <div key={i} className="bg-white/5 border border-white/10 rounded-[2rem] p-6 hover:bg-white/[0.08] transition-all group relative overflow-hidden">
+                            <div key={i} className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-all group relative overflow-hidden">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                 <div className="flex items-center justify-between mb-4 relative z-10">
-                                    <span className="text-xl font-black text-white italic tracking-tight">{topic.topic}</span>
+                                    <span className="text-xl font-black text-slate-900 dark:text-white italic tracking-tight">{topic.topic}</span>
                                     <div className="flex flex-col items-end">
                                         <span className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20`}>
                                             {topic.confidence} Strength Signal
                                         </span>
                                     </div>
                                 </div>
-                                <p className="text-sm text-slate-400 font-medium leading-relaxed relative z-10">
+                                <p className="text-sm text-slate-600 dark:text-slate-400 font-medium leading-relaxed relative z-10">
                                     {topic.reason}
                                 </p>
                             </div>
@@ -982,12 +1008,12 @@ function PersonalMentorView({ classroomId }: { classroomId: number }) {
 
                 {/* Recommendations */}
                 <div className="space-y-6">
-                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 px-2 flex items-center gap-3">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 dark:text-slate-500 px-2 flex items-center gap-3">
                         <Zap className="w-4 h-4 text-emerald-500" /> Actionable Recommendations
                     </h4>
                     <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-[3rem] p-8 space-y-8 relative overflow-hidden group">
                         <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-emerald-500/10 blur-[100px] rounded-full group-hover:bg-emerald-500/20 transition-all"></div>
-                        
+
                         <div className="space-y-6 relative z-10">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/20">
@@ -995,7 +1021,7 @@ function PersonalMentorView({ classroomId }: { classroomId: number }) {
                                 </div>
                                 <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Quick Concept Refresh</p>
                             </div>
-                            <p className="text-base text-slate-300 leading-relaxed font-bold italic">"{personalData.recommendations.conceptExplainer}"</p>
+                            <p className="text-base text-slate-700 dark:text-slate-300 leading-relaxed font-bold italic">"{personalData.recommendations.conceptExplainer}"</p>
                         </div>
 
                         <div className="h-[1px] bg-emerald-500/10 w-full relative z-10" />
@@ -1009,11 +1035,11 @@ function PersonalMentorView({ classroomId }: { classroomId: number }) {
                             </div>
                             <div className="grid gap-3">
                                 {personalData.recommendations.practiceQuestions.map((q: string, i: number) => (
-                                    <div key={i} className="flex items-center gap-4 bg-slate-950/50 p-5 rounded-2xl border border-white/5 hover:border-emerald-500/30 transition-all cursor-default">
+                                    <div key={i} className="flex items-center gap-4 bg-white/50 dark:bg-slate-950/50 p-5 rounded-2xl border border-slate-200 dark:border-white/5 hover:border-emerald-500/30 transition-all cursor-default">
                                         <div className="w-6 h-6 rounded-lg bg-emerald-600/20 flex items-center justify-center shrink-0">
                                             <span className="text-[10px] font-black text-emerald-500">{i+1}</span>
                                         </div>
-                                        <p className="text-sm text-slate-300 font-black tracking-tight">{q}</p>
+                                        <p className="text-sm text-slate-700 dark:text-slate-300 font-black tracking-tight">{q}</p>
                                     </div>
                                 ))}
                             </div>
@@ -1024,4 +1050,3 @@ function PersonalMentorView({ classroomId }: { classroomId: number }) {
         </div>
     );
 }
-

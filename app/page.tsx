@@ -1,8 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { SignInButton, SignUpButton, SignedIn, SignedOut, useClerk, UserButton } from "@clerk/nextjs";
-import { Sparkles, FileText, Map, MessageCircle, FileEdit, ArrowRight, Mail, Linkedin, Github } from "lucide-react";
+import {
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  useClerk,
+  UserButton,
+
+} from "@clerk/nextjs";
+
+import {
+  FileText,
+  Map,
+  MessageCircle,
+  FileEdit,
+  ArrowRight,
+  Mail,
+  Linkedin,
+  Github,
+  LayoutGrid,
+  Clipboard,
+  Activity,
+  Users,
+} from "lucide-react";
+
 import Link from "next/link";
 import {
   AlertDialog,
@@ -14,51 +37,135 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import ShapeGrid from "@/components/ShapeGrid";
+import { Inter, Staatliches } from "next/font/google";
+import ClassroomPreviewCard from "@/components/ClassroomPreviewCard";
+
+const inter = Inter({ subsets: ["latin"] });
+const staatliches = Staatliches({ weight: "400", subsets: ["latin"] });
 
 export default function Home() {
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
   const { signOut } = useClerk();
+
+  const features = [
+    {
+      title: "Real-time collaborative discussions",
+      description: "Share questions, answers, and classroom updates instantly across study groups.",
+      icon: MessageCircle,
+    },
+    {
+      title: "Smart classroom management",
+      description: "Organize learning spaces, schedules, and teacher workflows with ease.",
+      icon: LayoutGrid,
+    },
+    {
+      title: "Notes and resource sharing",
+      description: "Keep study materials, highlights, and shared guides organized in one hub.",
+      icon: Clipboard,
+    },
+    {
+      title: "Learning roadmaps and guidance",
+      description: "Follow curated study paths that keep learners focused on milestones.",
+      icon: Map,
+    },
+    {
+      title: "AI-powered doubt solving",
+      description: "Get instant, context-aware answers to questions with smart AI support.",
+      icon: Activity,
+    },
+    {
+      title: "Organized study collaboration",
+      description: "Coordinate projects, peer review, and group work with clear tools and structure.",
+      icon: Users,
+    },
+  ];
+  const howItWorks = [
+    {
+      title: "Join or create a classroom",
+      description: "Teachers set up rooms, students join using invite codes."
+    },
+    {
+      title: "Ask doubts instantly",
+      description: "Post questions using text or image and get AI + peer help."
+    },
+    {
+      title: "Get clear answers & insights",
+      description: "AI explanations, teacher guidance, and analytics all in one place."
+    }
+  ];
+
+  const testimonials = [
+    {
+      name: "Aarav Sharma",
+      role: "B.Tech Student",
+      text: "DoubtDesk made it so easy to clear my doubts during exam prep. The AI explanations are super clear."
+    },
+    {
+      name: "Neha Verma",
+      role: "CS Student",
+      text: "No more messy WhatsApp groups. Everything is structured and easy to follow."
+    },
+    {
+      name: "Rohit Mehta",
+      role: "Teaching Assistant",
+      text: "Analytics help me understand where students struggle the most."
+    }
+  ];
 
   const handleSignOut = async () => {
     await signOut({ redirectUrl: '/' });
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col selection:bg-blue-500/30">
+    <div className={`${inter.className} min-h-screen bg-background text-foreground flex flex-col selection:bg-[#5E8CFF]/30 transition-colors duration-300`}>
       {/* Navbar */}
-      <header className="fixed w-full bg-slate-950/80 backdrop-blur-xl border-b border-white/5 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-[0_0_20px_rgba(37,99,235,0.3)]">
+      <header className="fixed inset-x-0 top-0 z-50 bg-background/88 supports-[backdrop-filter]:bg-background/72 backdrop-blur-xl relative overflow-visible transition-colors duration-300">
+        <div className="absolute inset-x-0 bottom-0 h-px bg-border shadow-[0_0_10px_rgba(139,184,255,0.18)]" />
+        <div className="max-w-7xl mx-auto h-16 sm:h-20 flex items-center justify-between px-4 sm:px-6 md:px-[clamp(24px,5vw,64px)]">
+          <Link href="/" className="flex items-center gap-1 sm:gap-2 hover:opacity-90 transition-opacity shrink-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#5E8CFF] rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-[0_0_20px_rgba(94,140,255,0.25)] ring-1 ring-[#AABFFF]/35">
               D
             </div>
-            <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-500 to-purple-500">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground transition-colors drop-shadow-[0_0_10px_rgba(170,191,255,0.15)]">
               DoubtDesk
             </h1>
           </Link>
 
-          <div className="flex items-center gap-4">
+          <div className="hidden sm:flex items-center gap-3">
+            <a
+              href="#features"
+              className="px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400 transition-all duration-300 hover:text-blue-600 dark:hover:text-[#AABFFF] hover:drop-shadow-[0_0_8px_rgba(170,191,255,0.2)]"
+            >
+              Features
+            </a>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-4">
+            <ThemeToggle />
             <SignedOut>
-              <SignInButton mode="modal" forceRedirectUrl="/rooms">
-                <button className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-semibold border border-white/10 transition-all">
+              <Link href="/sign-in">
+                <button className="px-5 py-2.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-900 dark:text-white rounded-xl text-sm font-semibold border border-slate-200 dark:border-white/10 transition-all hover:shadow-[0_0_16px_rgba(255,255,255,0.08)]">
                   Sign In
                 </button>
-              </SignInButton>
-              <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
-                <button className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all">
+              </Link>
+
+              <Link href="/sign-up">
+                <button className="px-5 py-2.5 bg-[#5E8CFF] hover:bg-[#8BB8FF] text-white rounded-xl text-sm font-semibold shadow-[0_0_14px_rgba(94,140,255,0.28)] transition-all">
                   Join DoubtDesk
                 </button>
-              </SignUpButton>
+              </Link>
             </SignedOut>
             <SignedIn>
               <div className="flex items-center gap-4">
-                <Link href="/rooms" className="hidden sm:block px-4 py-2 text-sm font-semibold text-slate-300 hover:text-white transition-colors">
+                <Link href="/rooms" className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">
                   Classrooms
                 </Link>
-                <Link href="/profile" className="hidden sm:block px-4 py-2 text-sm font-semibold text-slate-300 hover:text-white transition-colors">
+                <Link href="/profile" className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">
                   Profile
                 </Link>
-                <UserButton 
+                <UserButton
                   afterSignOutUrl="/"
                   appearance={{
                     elements: {
@@ -74,15 +181,15 @@ export default function Home() {
 
       {/* Logout Confirmation Dialog */}
       <AlertDialog open={showSignOutDialog} onOpenChange={setShowSignOutDialog}>
-        <AlertDialogContent className="bg-slate-900 border-white/10 text-white">
+        <AlertDialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-400">
+            <AlertDialogDescription className="text-slate-600 dark:text-slate-400">
               You will need to log in again to access your classroom insights and doubt-solving history.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-white/10">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleSignOut}
               className="bg-red-600 hover:bg-red-700 text-white border-none"
@@ -94,64 +201,190 @@ export default function Home() {
       </AlertDialog>
 
       {/* Hero Section */}
-      <main className="flex-1 pt-24 mt-6 relative overflow-hidden">
-        <section className="px-6 pb-12 relative z-10">
-          <div className="max-w-7xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/10 text-blue-400 rounded-full text-sm font-medium mb-6 border border-blue-500/20 animate-fade-in backdrop-blur-md">
-              <Sparkles className="w-4 h-4" />
-              AI-Powered Classroom Collaboration
+      <main className="flex-1 pt-[128px] relative overflow-hidden scroll-smooth">
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <ShapeGrid
+            speed={0.45}
+            squareSize={42}
+            direction="diagonal"
+            borderColor="rgba(139, 184, 255, 0.10)"
+            hoverFillColor="rgba(94, 140, 255, 0.2)"
+            shape="square"
+            hoverTrailAmount={5}
+            className="opacity-90"
+          />
+          <div className="absolute inset-0 bg-slate-50/36 dark:bg-[#020617]/36" />
+        </div>
+        <section className="px-6 pb-12 relative z-10 pt-3 md:pt-6">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-12 xl:gap-16 items-start">
+            <div className="text-left">
+              <h2 className="max-w-[12ch] text-4xl sm:text-5xl lg:text-6xl xl:text-[4.2rem] font-black text-slate-900 dark:text-[#F2F5FF] tracking-tight leading-[1.04] mb-6">
+                Empower <br />
+                Your Learning <br />
+                with{' '}
+                <span className={`${staatliches.className} uppercase tracking-[0.08em] text-blue-600 dark:text-[#8BB8FF] drop-shadow-[0_0_10px_rgba(120,184,255,0.56)]`}>
+                  Collaborative AI.
+                </span>
+              </h2>
+
+              <div className="max-w-2xl mb-10">
+                <div className={`${staatliches.className} mb-3 text-sm tracking-[0.16em] text-blue-700 dark:text-[#AABFFF]/80 uppercase`}>
+                  Collaborative classrooms
+                </div>
+                <p className="text-xl text-slate-700 dark:text-slate-300/90 leading-relaxed">
+                  Built for collaborative classrooms, instant doubt solving, and smarter learning.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+                <SignedIn>
+                  <Link href="/rooms" className="w-full sm:w-auto">
+                    <button className="group px-10 py-5 bg-[#5E8CFF] text-white rounded-2xl text-lg font-bold hover:bg-[#8BB8FF] hover:shadow-[0_0_24px_rgba(94,140,255,0.35)] transition-all w-full flex items-center justify-center gap-2">
+                      <span className={`${staatliches.className} uppercase tracking-[0.08em]`}>Open Classroom</span>
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  </Link>
+                </SignedIn>
+                <SignedOut>
+                  <Link href="/sign-up" className="w-full sm:w-auto">
+                    <button className="group px-10 py-5 bg-white text-slate-950 rounded-2xl text-lg font-bold hover:bg-slate-200 transition-all w-full sm:w-auto flex items-center justify-center gap-2">
+                      <span className={`${staatliches.className} uppercase tracking-[0.08em]`}>
+                        Open
+                      </span>
+                      <span>Classroom</span>
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  </Link>
+                </SignedOut>
+              </div>
             </div>
 
-            <h2 className="text-6xl md:text-8xl font-black text-white tracking-tight leading-[1.1] mb-6">
-              Empower Your Learning with <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600">
-                Collaborative AI.
-              </span>
-            </h2>
-
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-12 leading-relaxed">
-              DoubtDesk is your AI-powered classroom companion. Get instant doubt solving, detailed teacher analytics, and participate in community boards for a smarter learning experience.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16">
-              <SignedIn>
-                <Link href="/rooms" className="w-full sm:w-auto">
-                  <button className="group px-10 py-5 bg-blue-600 text-white rounded-2xl text-lg font-bold hover:bg-blue-700 hover:shadow-[0_0_30px_rgba(37,99,235,0.4)] transition-all w-full flex items-center justify-center gap-2">
-                    Open Classroom
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </Link>
-              </SignedIn>
-              <SignedOut>
-                <SignUpButton mode="modal" forceRedirectUrl="/rooms">
-                  <button className="group px-10 py-5 bg-white text-slate-950 rounded-2xl text-lg font-bold hover:bg-slate-200 transition-all w-50 flex items-center justify-center gap-2">
-                    Open Classroom
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </SignUpButton>
-              </SignedOut>
+            <div className="flex items-center justify-center xl:justify-end">
+              <ClassroomPreviewCard />
             </div>
 
           </div>
         </section>
 
-        {/* Dynamic Background Elements */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none overflow-hidden -z-10">
-          <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-600/20 blur-[150px] rounded-full animate-pulse"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 blur-[150px] rounded-full"></div>
-          <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-cyan-600/10 blur-[120px] rounded-full"></div>
+        <section id="features" className="scroll-mt-28 px-6 py-16 md:py-20 relative z-10">
+          <div className="absolute inset-x-0 top-10 h-40 bg-gradient-to-r from-blue-500/10 via-transparent to-purple-500/10 blur-3xl pointer-events-none" />
+          <div className="max-w-7xl mx-auto">
+            <div className="max-w-3xl mx-auto text-center">
+              <div className={`${staatliches.className} mb-4 text-sm tracking-[0.16em] text-blue-700 dark:text-[#AABFFF]/70 uppercase`}>
+                Features
+              </div>
+              <h3 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 dark:text-[#F2F5FF] tracking-tight leading-tight">
+                Everything your classroom needs to solve doubts, stay aligned, and move faster.
+              </h3>
+              <p className="mt-5 text-base sm:text-lg text-slate-700 dark:text-slate-300/85 leading-8">
+                Built for modern study teams, DoubtDesk blends AI-powered doubt solving, shared resources, and smart classroom flows into a single polished platform.
+              </p>
+            </div>
 
-          {/* Subtle Grid Pattern */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-        </div>
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {features.map((feature) => {
+                const Icon = feature.icon;
+                return (
+                  <div
+                    key={feature.title}
+                    className="group relative overflow-hidden rounded-[2rem] border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.03] p-6 shadow-2xl shadow-slate-950/10 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-100 dark:hover:bg-white/[0.06]"
+                  >
+                    <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-blue-500/10 dark:bg-[#5E8CFF]/10 text-blue-600 dark:text-[#8BB8FF] shadow-[0_0_18px_rgba(94,140,255,0.18)] transition-colors duration-300 group-hover:bg-blue-500/15 dark:group-hover:bg-[#5E8CFF]/15">
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <h4 className="mt-6 text-xl font-semibold text-slate-900 dark:text-[#F2F5FF] tracking-tight">
+                      {feature.title}
+                    </h4>
+                    <p className="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-300/80">
+                      {feature.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+        {/* How It Works */}
+        <section id="how-it-works" className="px-6 py-20 relative z-10">
+          <div className="max-w-7xl mx-auto text-center">
+
+            <h3 className="text-3xl sm:text-4xl font-bold text-[#F2F5FF]">
+              How it works
+            </h3>
+
+            <p className="mt-4 text-slate-300/80">
+              Simple flow from doubt → solution → understanding
+            </p>
+
+            <div className="mt-12 grid md:grid-cols-3 gap-6">
+              {howItWorks.map((step, index) => (
+                <div
+                  key={step.title}
+                  className="p-6 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl hover:bg-white/[0.06] transition"
+                >
+                  <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#5E8CFF] text-white flex items-center justify-center font-bold shadow-[0_0_18px_rgba(94,140,255,0.45)] ring-1 ring-[#8BB8FF]/40">
+                    {index + 1}
+                  </div>
+
+                  <h4 className="text-lg font-semibold text-[#F2F5FF]">
+                    {step.title}
+                  </h4>
+
+                  <p className="mt-2 text-sm text-slate-300/80">
+                    {step.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </section>
+        {/* Testimonials */}
+        <section className="px-6 py-20 relative z-10">
+          <div className="max-w-7xl mx-auto text-center">
+            <div className={`${staatliches.className} mb-4 text-sm tracking-[0.16em] text-[#AABFFF]/70 uppercase`}>
+              Testimonials
+            </div>
+            <h3 className="text-3xl sm:text-4xl font-bold text-[#F2F5FF]">
+              What students say
+            </h3>
+
+            <p className="mt-4 text-slate-300/80">
+              Real feedback from learners and educators
+            </p>
+
+            <div className="mt-12 grid md:grid-cols-3 gap-6 text-left">
+              {testimonials.map((t) => (
+                <div
+                  key={t.name}
+                  className="p-6 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl hover:bg-white/[0.06] transition"
+                >
+                  <p className="text-slate-300/80 text-sm leading-7">
+                    “{t.text}”
+                  </p>
+
+                  <div className="mt-5">
+                    <div className="text-[#F2F5FF] font-semibold">
+                      {t.name}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {t.role}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </section>
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-white/5 bg-slate-950/50 py-5">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-slate-500">
+      {/*Here's Your Previous Footer. I have just commented it in case */}
+      {/* Footer
+      <footer className="border-t border-slate-200 dark:border-white/5 bg-white/50 dark:bg-slate-950/50 py-5">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-slate-500 dark:text-slate-500">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">D</div>
-            <span className="font-bold text-white">DoubtDesk</span>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-slate-900 dark:text-white font-bold text-sm">D</div>
+            <span className="font-bold text-slate-900 dark:text-white">DoubtDesk</span>
           </div>
           <p className="text-sm">© 2026 DoubtDesk. Engineered for Excellence.</p>
           <div className="flex items-center gap-6">
@@ -168,7 +401,7 @@ export default function Home() {
           <div className="flex gap-6 text-sm">
           </div>
         </div>
-      </footer>
+      </footer> */}
     </div>
   );
 }

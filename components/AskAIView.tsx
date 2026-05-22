@@ -61,6 +61,7 @@ export default function AskAIView({ classroomId = null, onSuccess, initialDoubt 
     const [isLoading, setIsLoading] = useState(false);
     const [currentType, setCurrentType] = useState<SolveType>('standard');
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [errorCode, setErrorCode] = useState<string | null>(null);
     const [isVideoLoading, setIsVideoLoading] = useState(false);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +72,7 @@ export default function AskAIView({ classroomId = null, onSuccess, initialDoubt 
             setImageBase64(initialDoubt.imageUrl);
             setResponse(null);
             setErrorMsg(null);
+            setErrorCode(null);
             setVideoUrl(null);
 
             // Fetch the solution from replies
@@ -140,6 +142,7 @@ export default function AskAIView({ classroomId = null, onSuccess, initialDoubt 
         setIsLoading(true);
         setCurrentType(type);
         setErrorMsg(null);
+        setErrorCode(null);
         setResponse(null);
         try {
             const res = await fetch('/api/ask-ai', {
@@ -148,7 +151,10 @@ export default function AskAIView({ classroomId = null, onSuccess, initialDoubt 
                 body: JSON.stringify({ prompt, type, imageBase64, classroomId })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data?.error || "The AI couldn't process your request.");
+            if (!res.ok) {
+                setErrorCode(data?.code || null);
+                throw new Error(data?.error || "The AI couldn't process your request.");
+            }
             setResponse(data.reply);
             if (onSuccess) onSuccess();
         } catch (err: any) {
@@ -163,8 +169,8 @@ export default function AskAIView({ classroomId = null, onSuccess, initialDoubt 
 
     return (
         <div ref={containerRef} className="space-y-8 text-left scroll-mt-24">
-            <div className="bg-slate-900/60 border border-white/8 rounded-3xl overflow-hidden shadow-2xl">
-                <div className="flex border-b border-white/5">
+            <div className="bg-white/60 dark:bg-slate-900/60 border border-slate-200 dark:border-white/8 rounded-3xl overflow-hidden shadow-2xl">
+                <div className="flex border-b border-slate-200 dark:border-white/5">
                     <button
                         onClick={() => { setInputMode('text'); setImageBase64(null); }}
                         className={`flex-1 flex items-center justify-center gap-2 py-4 text-xs font-black uppercase tracking-widest transition-all ${inputMode === 'text' ? 'text-blue-400 border-b-2 border-blue-500 bg-blue-500/5' : 'text-slate-500 hover:text-slate-300'}`}
@@ -185,9 +191,17 @@ export default function AskAIView({ classroomId = null, onSuccess, initialDoubt 
                             <textarea
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                                        e.preventDefault();
+                                        if (prompt.trim() || imageBase64) {
+                                            handleAskAI('standard');
+                                        }
+                                    }
+                                }}
                                 placeholder="Type your doubt here..."
                                 rows={4}
-                                className="w-full bg-slate-950/60 border border-white/8 rounded-2xl px-5 py-4 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all resize-none font-medium text-sm leading-relaxed"
+                                className="w-full bg-white/60 dark:bg-slate-950/60 border border-slate-200 dark:border-white/8 rounded-2xl px-5 py-4 text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all resize-none font-medium text-sm leading-relaxed"
                                 disabled={isLoading}
                             />
                         </>
@@ -197,23 +211,24 @@ export default function AskAIView({ classroomId = null, onSuccess, initialDoubt 
                             {!imageBase64 ? (
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-full h-44 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center gap-3 hover:border-purple-500/50 hover:bg-purple-500/5 transition-all group"
+                                    className="w-full h-44 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl flex flex-col items-center justify-center gap-3 hover:border-purple-500/50 hover:bg-purple-500/5 transition-all group"
                                 >
                                     <div className="w-14 h-14 bg-purple-500/10 rounded-2xl flex items-center justify-center border border-purple-500/20">
                                         <ImagePlus className="w-6 h-6 text-purple-400" />
                                     </div>
                                     <div className="text-center">
-                                        <p className="text-white font-bold text-xs uppercase tracking-widest">Select Image</p>
+                                        <p className="text-slate-900 dark:text-white font-bold text-xs uppercase tracking-widest">Select Image</p>
                                     </div>
                                 </button>
                             ) : (
-                                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-slate-950">
+                                <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-950">
                                     <img src={imageBase64} alt="Uploaded" className="w-full max-h-64 object-contain" />
                                     <button
                                         onClick={() => setImageBase64(null)}
                                         className="absolute top-3 right-3 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-lg"
+                                        aria-label="Remove image"
                                     >
-                                        <X className="w-4 h-4 text-white" />
+                                        <X className="w-4 h-4 text-slate-900 dark:text-white" />
                                     </button>
                                 </div>
                             )}
@@ -226,7 +241,7 @@ export default function AskAIView({ classroomId = null, onSuccess, initialDoubt 
                             disabled={isLoading || (!prompt.trim() && !imageBase64)}
                             className="flex items-center gap-2 px-5 py-3 bg-pink-500/10 hover:bg-pink-500/20 text-pink-400 border border-pink-500/20 rounded-2xl font-black uppercase tracking-widest text-[9px] transition-all disabled:opacity-40"
                         >
-                            <Brain className="w-3 h-3" /> ELI 10
+                            {isLoading && currentType === 'eli10' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />} ELI 10
                         </button>
                         <button
                             onClick={() => handleAskAI('standard')}
@@ -241,24 +256,24 @@ export default function AskAIView({ classroomId = null, onSuccess, initialDoubt 
             </div>
 
             {isVideoLoading && (
-                <div className="p-12 bg-slate-900/40 border border-white/5 rounded-3xl flex flex-col items-center justify-center gap-4 text-center">
+                <div className="p-12 bg-white/40 dark:bg-slate-900/40 border border-slate-200 dark:border-white/5 rounded-3xl flex flex-col items-center justify-center gap-4 text-center">
                     <div className="relative">
                         <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
                         <Zap className="w-6 h-6 text-yellow-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
                     </div>
                     <div>
-                        <p className="text-white font-black uppercase tracking-widest text-xs">Generating Video AI Masterpiece</p>
-                        <p className="text-slate-500 text-[10px] mt-1 italic">Creating slides, synthesizing voice, and rendering frames...</p>
+                        <p className="text-slate-900 dark:text-white font-black uppercase tracking-widest text-xs">Generating Video AI Masterpiece</p>
+                        <p className="text-slate-500 dark:text-slate-500 text-[10px] mt-1 italic">Creating slides, synthesizing voice, and rendering frames...</p>
                     </div>
                 </div>
             )}
 
             {videoUrl && (
-                <div className="bg-slate-950 border-4 border-blue-500/30 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-blue-500/10">
+                <div className="bg-white dark:bg-slate-950 border-4 border-blue-500/30 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-blue-500/10">
                     <div className="bg-blue-500/10 px-6 py-4 border-b border-blue-500/20 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <Zap className="w-5 h-5 text-blue-400" />
-                            <span className="text-white font-black uppercase tracking-tighter italic">AI Video Explanation</span>
+                            <span className="text-slate-900 dark:text-white font-black uppercase tracking-tighter italic">AI Video Explanation</span>
                         </div>
                         <span className="bg-blue-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase italic">4K UHD AI</span>
                     </div>
@@ -267,8 +282,12 @@ export default function AskAIView({ classroomId = null, onSuccess, initialDoubt 
             )}
 
             {errorMsg && (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-500 text-xs font-bold">
-                    <AlertCircle className="w-4 h-4" /> {errorMsg}
+                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3 text-red-500 text-xs font-bold">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <div>
+                        <p>{errorCode === "IMAGE_QUALITY_LOW" ? "Image quality issue" : "Unable to solve this doubt"}</p>
+                        <p className="mt-1 text-red-400/75 font-medium">{errorMsg}</p>
+                    </div>
                 </div>
             )}
 
@@ -277,21 +296,21 @@ export default function AskAIView({ classroomId = null, onSuccess, initialDoubt 
                     {sections.map((sec, idx) => {
                         const meta = SECTION_META[sec.title];
                         return (
-                            <div key={idx} className="bg-slate-900/60 border border-white/8 rounded-3xl overflow-hidden shadow-lg">
-                                <div className={`flex items-center gap-3 px-6 py-4 border-b border-white/5`}>
+                            <div key={idx} className="bg-white/60 dark:bg-slate-900/60 border border-slate-200 dark:border-white/8 rounded-3xl overflow-hidden shadow-lg">
+                                <div className={`flex items-center gap-3 px-6 py-4 border-b border-slate-200 dark:border-white/5`}>
                                     {meta && (
-                                        <div className={`flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 border ${meta.badge}`}>
+                                        <div className={`flex items-center justify-center w-8 h-8 rounded-xl bg-slate-100 dark:bg-white/5 border ${meta.badge}`}>
                                             {meta.icon}
                                         </div>
                                     )}
-                                    <h2 className="text-white font-black tracking-tight text-sm uppercase italic">{sec.title}</h2>
+                                    <h2 className="text-slate-900 dark:text-white font-black tracking-tight text-sm uppercase italic">{sec.title}</h2>
                                     {idx === 0 && (
                                         <button
                                             onClick={handleGenerateVideo}
                                             disabled={isVideoLoading}
-                                            className="ml-auto flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold uppercase tracking-tighter text-[9px] shadow-lg shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50"
+                                            className="ml-auto flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-slate-900 dark:text-white rounded-xl font-bold uppercase tracking-tighter text-[9px] shadow-lg shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50"
                                         >
-                                            <Zap className="w-3 h-3 text-yellow-400 fill-yellow-400" /> Generate Video
+                                            {isVideoLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3 text-yellow-400 fill-yellow-400" />} {isVideoLoading ? "Generating..." : "Generate Video"}
                                         </button>
                                     )}
                                 </div>

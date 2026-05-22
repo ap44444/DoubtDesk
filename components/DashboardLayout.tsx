@@ -15,6 +15,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { ThemeToggle } from "@/components/ThemeToggle"
 
 export default function DashboardLayout({
     children,
@@ -23,60 +24,90 @@ export default function DashboardLayout({
 }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const [showSignOutDialog, setShowSignOutDialog] = useState(false)
+
     const { signOut } = useClerk()
 
     const handleSignOut = async () => {
-        await signOut({ redirectUrl: '/' })
+        await signOut({ redirectUrl: "/" })
     }
 
     return (
-        <div className="flex h-screen bg-slate-950 overflow-hidden text-slate-200">
+        <div className="flex h-screen overflow-hidden bg-gradient-to-br from-background via-background to-muted/20 text-foreground transition-colors duration-300">
             {/* Sidebar */}
-            <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+            <Sidebar
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+            />
 
-            {/* Main Content Wrapper */}
-            <div className="flex-1 flex flex-col min-w-0">
+            {/* Main Content */}
+            <div className="flex flex-1 min-w-0 flex-col">
                 {/* Header */}
-                <header className="bg-slate-950/80 backdrop-blur-xl border-b border-white/5 z-20 shrink-0 h-20 flex items-center">
-                    <div className="flex-1 flex items-center justify-between px-6">
-                        <div className="flex items-center gap-4">
+                <header className="sticky top-0 z-20 flex h-16 md:h-20 shrink-0 items-center border-b border-border/60 bg-background/70 backdrop-blur-2xl shadow-sm transition-colors duration-300">
+                    <div className="flex flex-1 items-center justify-between px-4 md:px-6">
+                        {/* Left Section */}
+                        <div className="flex items-center gap-3">
                             <button
                                 onClick={() => setIsSidebarOpen(true)}
-                                className="lg:hidden p-2 text-slate-400 hover:bg-white/5 rounded-lg mr-2"
+                                className="lg:hidden p-2.5 rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-all duration-200 hover:scale-105"
+                                aria-label="Open sidebar"
                             >
-                                <Menu className="w-6 h-6" />
+                                <Menu className="w-5 h-5" />
                             </button>
+
+                            <div className="hidden md:flex flex-col">
+                                <h1 className="text-sm font-semibold tracking-wide text-foreground">
+                                    Dashboard
+                                </h1>
+                                <p className="text-xs text-muted-foreground">
+                                    Welcome back to DoubtDesk
+                                </p>
+                            </div>
                         </div>
 
-                        <div className="flex items-center gap-4">
+                        {/* Right Section */}
+                        <div className="flex items-center gap-3 md:gap-4">
+                            <ThemeToggle />
+
                             <SignedIn>
-                                <div className="flex items-center gap-4">
-                                    <Link href="/profile" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <Link
+                                        href="/profile"
+                                        className="hidden sm:block text-sm font-medium text-muted-foreground hover:text-blue-400 transition-all duration-200"
+                                    >
                                         Profile
                                     </Link>
+
                                     <UserButton
                                         appearance={{
                                             elements: {
                                                 userButtonPopoverActionButton__signOut: {
-                                                    display: "none"
+                                                    display: "none",
                                                 },
                                                 userButtonPopoverFooter: {
-                                                    display: "none"
+                                                    display: "none",
                                                 },
-                                                userButtonAvatarBox: "w-10 h-10 border border-white/10"
-                                            }
+                                                userButtonAvatarBox:
+                                                    "w-10 h-10 border border-border hover:scale-105 transition-transform duration-200",
+                                            },
                                         }}
                                     >
                                         <UserButton.MenuItems>
                                             <UserButton.Link
                                                 label="Profile"
-                                                labelIcon={<User className="w-4 h-4" />}
+                                                labelIcon={
+                                                    <User className="w-4 h-4" />
+                                                }
                                                 href="/profile"
                                             />
+
                                             <UserButton.Action
                                                 label="Sign Out"
-                                                labelIcon={<LogOut className="w-4 h-4" />}
-                                                onClick={() => setShowSignOutDialog(true)}
+                                                labelIcon={
+                                                    <LogOut className="w-4 h-4" />
+                                                }
+                                                onClick={() =>
+                                                    setShowSignOutDialog(true)
+                                                }
                                             />
                                         </UserButton.MenuItems>
                                     </UserButton>
@@ -86,20 +117,31 @@ export default function DashboardLayout({
                     </div>
                 </header>
 
-                {/* Confirm Sign Out Dialog */}
-                <AlertDialog open={showSignOutDialog} onOpenChange={setShowSignOutDialog}>
-                    <AlertDialogContent className="bg-slate-900 border-white/10 text-white">
+                {/* Sign Out Dialog */}
+                <AlertDialog
+                    open={showSignOutDialog}
+                    onOpenChange={setShowSignOutDialog}
+                >
+                    <AlertDialogContent className="bg-popover/95 backdrop-blur-xl border border-border/60 text-popover-foreground shadow-2xl">
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle>
-                            <AlertDialogDescription className="text-slate-400">
-                                You will need to log in again to access your dashboard and AI tools.
+                            <AlertDialogTitle>
+                                Are you sure you want to sign out?
+                            </AlertDialogTitle>
+
+                            <AlertDialogDescription className="text-muted-foreground">
+                                You will need to log in again to access your
+                                dashboard and AI tools.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
+
                         <AlertDialogFooter>
-                            <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+                            <AlertDialogCancel className="border-border bg-background text-foreground hover:bg-accent">
+                                Cancel
+                            </AlertDialogCancel>
+
                             <AlertDialogAction
                                 onClick={handleSignOut}
-                                className="bg-red-600 hover:bg-red-700 text-white border-none"
+                                className="border-none bg-red-600 text-white hover:bg-red-700"
                             >
                                 Sign Out
                             </AlertDialogAction>
@@ -107,9 +149,11 @@ export default function DashboardLayout({
                     </AlertDialogContent>
                 </AlertDialog>
 
-                {/* Scrollable Content */}
-                <main className="flex-1 overflow-auto bg-slate-950">
-                    {children}
+                {/* Page Content */}
+                <main className="flex-1 overflow-y-auto bg-background/40 backdrop-blur-sm scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent transition-colors duration-300">
+                    <div className="p-4 md:p-6">
+                        {children}
+                    </div>
                 </main>
             </div>
         </div>

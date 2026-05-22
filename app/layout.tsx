@@ -5,6 +5,7 @@ import {
   ClerkProvider,
 } from '@clerk/nextjs'
 import { Provider } from "./provider";
+import Footer from "@/components/Footer";
 
 
 
@@ -13,10 +14,86 @@ const AppFont = DM_Sans({
   subsets: ['latin'],
   variable: '--font-app',
 })
+
+const DEFAULT_SITE_URL = "https://doubt-desk-seven.vercel.app";
+
+function getSiteUrl() {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL ||
+    DEFAULT_SITE_URL;
+
+  return siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`;
+}
+
+const siteUrl = getSiteUrl();
+
 export const metadata: Metadata = {
-  title: "DoubtDesk - AI Doubt Solver",
-  description: "DoubtDesk is an AI-powered collaborative classroom platform where students get instant doubt resolution, teachers manage virtual classrooms, and analytics drive better learning outcomes.",
-};
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "DoubtDesk | AI Doubt Solver",
+    template: "%s | DoubtDesk",
+  },
+  description:
+    "DoubtDesk enables students to solve engineering doubts instantly with AI, join interactive classrooms, and view clear learning analytics.",
+
+  keywords: [
+    "DoubtDesk",
+    "AI doubt solver",
+    "engineering education",
+    "real-time debugging",
+    "classroom analytics",
+    "student mentorship",
+    "programming help"
+  ],
+  
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  openGraph: {
+    title: "DoubtDesk | AI Doubt Solver",
+    description:
+      "DoubtDesk enables students to solve engineering doubts instantly with AI, join interactive classrooms, and view clear learning analytics.",
+    url: siteUrl,
+    siteName: "DoubtDesk",
+    images: [
+      {
+        url: `${siteUrl}/og-image.png`,
+        width: 1200,
+        height: 630,
+        alt: "DoubtDesk - AI classroom doubt-solving platform",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "DoubtDesk | AI Doubt Solver",
+    description:
+      "DoubtDesk enables students to solve engineering doubts instantly with AI, join interactive classrooms, and view clear learning analytics.",
+    images: [`${siteUrl}/og-image.png`],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    nocache: false,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-snippet": -1,
+      "max-image-preview": "large",
+      "max-video-preview": -1,
+      },
+    },
+  };
 
 export default function RootLayout({
   children,
@@ -25,13 +102,13 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="en" suppressHydrationWarning>
         <body
-          className={AppFont.className}
+          className={`${AppFont.className} scroll-smooth`}
         >
           <Provider>
             {children}
-
+            <Footer/>
           </Provider>
         </body>
       </html>

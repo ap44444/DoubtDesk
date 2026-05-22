@@ -26,14 +26,34 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 const USER_ENDPOINT = "/api/user";
 
 import SessionTracker from "@/components/auth/SessionTracker";
-import { Toaster } from "sonner";
-import { useRouter, usePathname } from "next/navigation";
+import { Toaster } from "@/components/ui/sonner";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
+import { CommandMenu } from "@/components/CommandMenu";
+import { ThemeProvider, useTheme } from "next-themes";
+import { FullScreenSpinner } from "../components/FullScreenSpinner";
+
+function ThemedToaster() {
+    const { resolvedTheme } = useTheme();
+
+    return (
+        <Toaster
+            theme={resolvedTheme === "dark" ? "dark" : "light"}
+            closeButton
+            richColors
+            duration={4000}
+            position="top-right"
+        />
+    );
+}
 
 export function Provider({ children }: { children: React.ReactNode }) {
     const [appUser, setAppUser] = useState<AppUser | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isNavigating, setIsNavigating] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
+    const searchParams = useSearchParams();
 
     async function refresh() {
         setLoading(true);
@@ -63,6 +83,37 @@ export function Provider({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
+        setIsNavigating(false);
+    }, [pathname, searchParams]);
+
+    useEffect(() => {
+            const handleAnchorClick = (event: MouseEvent) => {
+                const target = event.target;
+                
+                if (!(target instanceof Element)) {
+                    return;
+                }
+            
+                const anchor = target.closest("a");
+            
+                if (!(anchor instanceof HTMLAnchorElement) || !anchor.href || anchor.target === "_blank") {
+                    return;
+                }
+            
+                const targetUrl = new URL(anchor.href);
+                const currentUrl = new URL(window.location.href);
+                if (
+                    targetUrl.origin === currentUrl.origin &&
+                    (targetUrl.pathname !== currentUrl.pathname || targetUrl.search !== currentUrl.search)
+                ) {
+                    setIsNavigating(true);
+                }
+            };
+            document.addEventListener("click", handleAnchorClick);
+            return () => document.removeEventListener("click", handleAnchorClick);
+    }, []);
+
+    useEffect(() => {
         if (!loading && appUser && !appUser.onboarded) {
             const publicPaths = ['/onboarding', '/sign-in', '/sign-up', '/', '/public-rooms'];
             const isPublic = publicPaths.some(path => pathname === path || pathname.startsWith('/public-rooms'));
@@ -74,9 +125,18 @@ export function Provider({ children }: { children: React.ReactNode }) {
 
     return (
         <UserContext.Provider value={{ appUser, setAppUser, loading, refresh }}>
-            <SessionTracker />
-            {children}
-            <Toaster theme="dark" closeButton />
+            <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="doubtdesk-theme">
+                <KeyboardShortcutsProvider>
+                    <SessionTracker />
+                    
+                    {/* 🌀 This catches client-side clicks instantly! */}
+                    {isNavigating && <FullScreenSpinner/>}
+
+                    {children}
+                    <CommandMenu />
+                    <ThemedToaster />
+                </KeyboardShortcutsProvider>
+            </ThemeProvider>
         </UserContext.Provider>
     );
 }
