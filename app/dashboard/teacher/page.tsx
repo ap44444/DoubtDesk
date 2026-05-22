@@ -6,47 +6,25 @@ import {
     PieChart, Pie, Cell, Legend
 } from "recharts";
 import { Loader2, TrendingUp, AlertCircle, CheckCircle2, Users } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 
 const COLORS = ["#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981"];
 
 export default function TeacherDashboard() {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const searchParams = useSearchParams();
-    const classroomId = searchParams.get("classroomId");
 
     useEffect(() => {
-        // refetch when classroomId changes
-        if (!classroomId) {
-            setLoading(false);
-            setData(null);
-            return;
-        }
-
-        setLoading(true);
-        setData(null);
-
-        fetch(`/api/teacher/insights?classroomId=${classroomId}`)
-            .then(res => {
-                if (!res.ok) throw res;
-                return res.json();
-            })
+        fetch("/api/teacher/insights")
+            .then(res => res.json())
             .then(json => {
                 setData(json);
                 setLoading(false);
             })
-            .catch(async (err) => {
-                try {
-                    const body = err && (await err.json?.());
-                    console.error('Failed to fetch insights:', body || err);
-                } catch (e) {
-                    console.error('Failed to fetch insights:', err);
-                }
-                setData(null);
+            .catch(err => {
+                console.error(err);
                 setLoading(false);
             });
-    }, [classroomId]);
+    }, []);
 
     if (loading) {
         return (
@@ -54,10 +32,6 @@ export default function TeacherDashboard() {
                 <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
             </div>
         );
-    }
-
-    if (!classroomId) {
-        return <div className="text-slate-900 dark:text-white text-center py-10 font-bold uppercase tracking-widest text-xs">Add a classroomId to load teacher insights</div>;
     }
 
     if (!data) return <div className="text-slate-900 dark:text-white text-center py-10 font-bold uppercase tracking-widest text-xs">Failed to load analytics</div>;
